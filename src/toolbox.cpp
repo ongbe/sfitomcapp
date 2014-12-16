@@ -225,7 +225,6 @@ void  GetFormatTickCount( FORMATTICKCOUNT &fc)
 返回值：返回输入的密码
 备注：需要在link中加入-lcurses
 */
-/*
 int inputPWD(string password)
 {
 	string pwd;
@@ -261,7 +260,6 @@ int inputPWD(string password)
 		_exit(-1);
 	}
 }
-*/
 
 /*函数名称：timewait()
 函数功能：
@@ -479,7 +477,6 @@ int getThreadID()
 	return (int)pthread_self();
 }
 
-
 //设置当前线程的cpu序号
 int setThreadCPUCore(int _coreid)
 {
@@ -501,7 +498,6 @@ long getMemorySize()
 	return s_info.totalram;
 }
 
-
 string getOSversion()
 {
 	ifstream f("/etc/redhat-release");
@@ -511,7 +507,6 @@ string getOSversion()
 		return line;
 	}
 }
-
 
 string getCPUInfo()
 {
@@ -548,6 +543,94 @@ string getEthernetInterfaceType()
 	return rt;
 }
 
+void disclaimer()
+{
+	int row,col;
+
+	initscr();
+	getmaxyx(stdscr,row,col);
+	int c = (col-64)/2;
+	int s = row/2-8;
+	mvprintw(s++,c,"+--------------------------------------------------------------+");
+	mvprintw(s++,c,"|                           免 责 声 明                        |");
+	mvchgat(s,c+28,11,A_BOLD|A_BLINK,0,NULL);
+	mvprintw(s++,c,"+--------------------------------------------------------------+");
+	mvprintw(s++,c,"| 本软件只做内部测试使用，一切因使用本软件而引致之任何意外、   |"); 
+	mvprintw(s++,c,"| 疏忽、合约毁坏、诽谤、版权或知识产权侵犯及其所造成的损失，本 |"); 
+	mvprintw(s++,c,"| 软件概不负责，亦不承担任何法律责任。                         |"); 
+	mvprintw(s++,c,"+--------------------------------------------------------------+"); 
+	attron(A_BOLD);
+	mvprintw(s++,c,"如果要继续使用，则表示您已阅读并同意上述声明的所有条款之约定；否"); 
+	mvprintw(s++,c,"则立即停止使用。"); 
+	attroff(A_BOLD);
+	mvprintw(s++,c,"同意并继续使用(输入jixu)，不同意(n):");
+	
+	char a[5];
+	char i;
+	int n=0;
+	noecho();
+	do 
+	{
+		i = getch();
+		if (i == 8)
+		{
+			if (n<=0)	//无法再退格
+			{
+				continue;
+			}
+			
+			echochar('\b');
+			echochar(' ');
+			echochar('\b');
+			a[n-1]='\0';
+			n--;
+		}
+		else
+		{
+			if (n>=4)	//无法再前进
+			{
+				continue;
+			}
+
+			addch(i |A_BOLD);
+			a[n]=i;
+			a[n+1]='\0';
+			n++;
+		}
+
+	} while (i != '\n');
+	
+	refresh();
+	endwin();
+	system("clear");
+
+	if (strncmp(a,"jixu",4)==0)
+	{
+		return;
+	}
+	else
+	{
+		_exit(0);
+	}
+}
+
+void pressentertocontiue()
+{
+	char c;
+	c = getchar();
+	c = getchar();
+	while ( c != EOF )
+	{
+		if ( c == '\n' )
+		{
+			return;
+		}
+		else
+		{
+			_exit(0);
+		}
+	}
+}
 
 //////////////////////////////////////////////////////////////////////////
 

@@ -18,7 +18,7 @@
 #include <sys/ipc.h> 
 #include <sys/shm.h> 
 #include <sys/sem.h>
-
+#include <ncurses.h>
 
 #define CON_WIN_WIDTH 150
 typedef unsigned long DWORD;
@@ -82,7 +82,7 @@ DWORD GetTickCount();
 void GetFormatTickCount(FORMATTICKCOUNT &fc);
 
 //输入密码，以*号显示
-//int inputPWD(string password);
+int inputPWD(string password);
 
 //等待一定的毫秒时间
 void timewait(DWORD ms);
@@ -129,6 +129,12 @@ string getCPUInfo();
 
 //获取网卡信息
 string getEthernetInterfaceType();
+
+//打印在屏幕正中间
+void disclaimer();
+
+//按回车继续
+void pressentertocontiue();
 
 //锁，这个锁在离开作用域的时候自动解锁，很给力。
 class CSimpleMutex

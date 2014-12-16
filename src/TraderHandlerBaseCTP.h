@@ -30,12 +30,16 @@ private:
 	bool bOnRspOrderAction;
 	bool bOnRspOrderInsert;
 	bool bOnRspError;
+	bool bOnRtnOrder;
 	TThostFtdcRequestIDType nRequestID;
 	TThostFtdcInstrumentIDType m_instrumentid;
 	TThostFtdcExchangeIDType m_exchangeid;
 	TIMES m_times;
 	int m_interval;
-	DWORD m_duration;
+	DWORD m_delaytest_duration;
+	DWORD m_presstest_mount;
+	DWORD m_presstest_frq;
+	int uid;
 
 private:
 	virtual void OnFrontConnected();
@@ -47,6 +51,9 @@ private:
 	virtual void OnRtnOrder(CThostFtdcOrderField *pOrder);
 
 public:
-	void orderinsert();
-	void connect();
+	void delaytest();
+	void connect(int _uid = 0);
+	void showdelaytestconfirmsg();
+	void presstest(DWORD _interval);
+	void showpresstestconfirmsg();
 };

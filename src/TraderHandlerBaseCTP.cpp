@@ -6,9 +6,6 @@ CTraderHandlerBaseCTP::CTraderHandlerBaseCTP()
 	m_frontID = 0;
 	m_sessionID = 0;
 	memset(&m_orderSysID, 0, sizeof(TThostFtdcOrderSysIDType));
-	memset(&m_brokerID, 0, sizeof(TThostFtdcBrokerIDType));
-	memset(&m_userID, 0, sizeof(TThostFtdcUserIDType));
-	memset(&m_password, 0, sizeof(TThostFtdcPasswordType));
 	sem_init(&event_OnRspUserLogin, 0, 0);
 	sem_init(&event_OnRtnOrder, 0, 0);
 	sem_init(&event_UnknownOrder, 0, 0);
@@ -19,11 +16,11 @@ CTraderHandlerBaseCTP::CTraderHandlerBaseCTP()
 	bOnRspOrderAction=atoi(getConfig("LOG","OnRspOrderAction").c_str());
 	bOnRspOrderInsert=atoi(getConfig("LOG","OnRspOrderInsert").c_str());
 	bOnRspError=atoi(getConfig("LOG","OnRspError").c_str());
+	bOnRtnOrder=false;
 	nRequestID = 0;
 	strcpy(m_instrumentid, getConfig("CTP","InstrumentID").c_str());
 	strcpy(m_exchangeid, getConfig("CTP","ExchangeID").c_str());
 	m_interval=atoi(getConfig("CTP","Interval").c_str());
-	m_duration=atoi(getConfig("CTP","Duration").c_str());
 	memset(&m_times, 0, sizeof(TIMES));
 }
 
@@ -110,7 +107,7 @@ void CTraderHandlerBaseCTP::OnRspOrderInsert(CThostFtdcInputOrderField *pInputOr
 
 void CTraderHandlerBaseCTP::OnRtnOrder(CThostFtdcOrderField *pOrder)
 {
-	if (pOrder->FrontID!=m_frontID || pOrder->SessionID!=m_sessionID) return;
+	if (pOrder->FrontID!=m_frontID || pOrder->SessionID!=m_sessionID || !bOnRtnOrder) return;
 	if (pOrder->OrderStatus=='5')
 	{
 		DWORD rt = GetTickCount()-m_times.inserttime;
@@ -163,7 +160,7 @@ void CTraderHandlerBaseCTP::OnRtnOrder(CThostFtdcOrderField *pOrder)
 	}
 }
 
-void CTraderHandlerBaseCTP::orderinsert()
+void CTraderHandlerBaseCTP::delaytest()
 {
 	WaitForSingleObject(event_OnRspUserLogin, INFINITE);
 
@@ -175,7 +172,7 @@ void CTraderHandlerBaseCTP::orderinsert()
 	inputOrder.OrderPriceType=THOST_FTDC_OPT_LimitPrice;
 	strcpy(inputOrder.CombOffsetFlag, "0");
 	strcpy(inputOrder.CombHedgeFlag, "1");
-	inputOrder.LimitPrice=1;		///price
+	inputOrder.LimitPrice=-1;		///price
 	inputOrder.VolumeTotalOriginal=1;
 	inputOrder.TimeCondition= THOST_FTDC_TC_GFD;
 	strcpy(inputOrder.GTDDate, "");
@@ -195,6 +192,8 @@ void CTraderHandlerBaseCTP::orderinsert()
 	strcpy(orderAction.ExchangeID, m_exchangeid);
 	strcpy(orderAction.InstrumentID, m_instrumentid);
 	orderAction.ActionFlag=THOST_FTDC_AF_Delete;
+
+	m_delaytest_duration = atoi(getConfig("CTP","Duration").c_str());
 	
 	tStart = tEnd = GetTickCount();
 
@@ -220,16 +219,18 @@ void CTraderHandlerBaseCTP::orderinsert()
 		usleep(m_interval);			
 		tEnd=GetTickCount();
 		nCount++;
-		if (tEnd-tStart>=m_duration*1000000) return;
+		if (tEnd-tStart>=m_delaytest_duration*1000000) return;
 	}
 }
 
-void CTraderHandlerBaseCTP::connect()
+void CTraderHandlerBaseCTP::connect(int _uid)
 {
-	//获取投资者信息
-	strcpy(m_brokerID, getConfig("CTP","BrokerID").c_str());
-	strcpy(m_userID, getConfig("CTP","UserID").c_str());
-	strcpy(m_password, getConfig("CTP","Password").c_str());
+	uid = _uid;
+	cout<<"connecting to front..."<<endl;
+
+	strcpy(m_brokerID, g_userlist[uid].BrokerID.c_str());
+	strcpy(m_userID, g_userlist[uid].UserID.c_str());
+	strcpy(m_password, g_userlist[uid].Password.c_str());
 
 	m_pUserApi=CThostFtdcTraderApi::CreateFtdcTraderApi();
 	m_pUserApi->RegisterSpi(this);
@@ -237,5 +238,96 @@ void CTraderHandlerBaseCTP::connect()
 	m_pUserApi->SubscribePublicTopic(THOST_TERT_QUICK);
 	m_pUserApi->RegisterFront(const_cast<char *>(getConfig("CTP","FrontAddr").c_str()));
 	m_pUserApi->Init();		//初始化后才会去向前置连接，才会触发onfrontconnected()//
-	WaitForSingleObject(m_event_FrontConnected, INFINITE);
+	while (WaitForSingleObject(m_event_FrontConnected, 5000) == WAIT_TIMEOUT)
+	{
+		cout<<"connect time out!"<<endl;
+	}
 }
+
+void CTraderHandlerBaseCTP::showdelaytestconfirmsg()
+{
+	cout<<"----------------------------报单信息确认----------------------------\n"
+		<<"交易前置地址="<<getConfig("CTP","FrontAddr")<<"\n"
+		<<"BrokerID="<<g_userlist[uid].BrokerID<<"\n"
+		<<"UserID="<<g_userlist[uid].UserID<<"\n"
+		<<"合约="<<getConfig("CTP","InstrumentID")<<"\n"
+		<<"交易所="<<getConfig("CTP","ExchangeID")<<"\n"
+		<<"方向=买\n"
+		<<"开平=开\n"
+		<<"价格=-1.0\n"
+		<<"手数=1\n"
+		<<"报单间隔="<<atoi(getConfig("CTP","Interval").c_str())/1000.0<<"ms\n"
+		<<"报单持续时间="<<atoi(getConfig("CTP","Duration").c_str())<<"s\n"
+		<<"[按回车开始报单测试]"
+		<<endl;
+
+	pressentertocontiue();
+}
+
+void CTraderHandlerBaseCTP::presstest(DWORD _interval)
+{
+	WaitForSingleObject(event_OnRspUserLogin, INFINITE);
+
+	CThostFtdcInputOrderField inputOrder={0};
+	strcpy(inputOrder.BrokerID, m_brokerID);
+	strcpy(inputOrder.UserID, m_userID);
+	strcpy(inputOrder.InvestorID, m_userID);
+	strcpy(inputOrder.InstrumentID, m_instrumentid);
+	inputOrder.OrderPriceType=THOST_FTDC_OPT_LimitPrice;
+	strcpy(inputOrder.CombOffsetFlag, "0");
+	strcpy(inputOrder.CombHedgeFlag, "1");
+	inputOrder.LimitPrice=atof(getConfig("CTP","PressPrice").c_str());		///price
+	inputOrder.VolumeTotalOriginal=1;
+	inputOrder.TimeCondition= THOST_FTDC_TC_GFD;
+	strcpy(inputOrder.GTDDate, "");
+	inputOrder.VolumeCondition = THOST_FTDC_VC_AV;
+	inputOrder.MinVolume = 0;
+	inputOrder.ContingentCondition = THOST_FTDC_CC_Immediately;
+	inputOrder.StopPrice = 0;
+	inputOrder.ForceCloseReason = THOST_FTDC_FCC_NotForceClose;
+	inputOrder.IsAutoSuspend = 0;
+	inputOrder.Direction=THOST_FTDC_D_Buy;		///direction
+
+	bOnRtnOrder = false;
+
+	cout<<"压力测试中..."<<endl;
+
+	while (1)
+	{
+		strcpy(inputOrder.CombOffsetFlag, "0");
+		inputOrder.Direction=THOST_FTDC_D_Buy;
+		inputOrder.RequestID=nRequestID++;
+		m_pUserApi->ReqOrderInsert(&inputOrder, 0);
+		Sleep(_interval);
+
+		strcpy(inputOrder.CombOffsetFlag, "0");
+		inputOrder.Direction=THOST_FTDC_D_Sell;
+		inputOrder.RequestID=nRequestID++;
+		m_pUserApi->ReqOrderInsert(&inputOrder, 0);
+		Sleep(_interval);
+
+		strcpy(inputOrder.CombOffsetFlag, "1");
+		inputOrder.Direction=THOST_FTDC_D_Buy;
+		inputOrder.RequestID=nRequestID++;
+		m_pUserApi->ReqOrderInsert(&inputOrder, 0);
+		Sleep(_interval);
+
+		strcpy(inputOrder.CombOffsetFlag, "1");
+		inputOrder.Direction=THOST_FTDC_D_Sell;
+		inputOrder.RequestID=nRequestID++;
+		m_pUserApi->ReqOrderInsert(&inputOrder, 0);
+		Sleep(_interval);
+	}
+}
+
+void CTraderHandlerBaseCTP::showpresstestconfirmsg()
+{
+	cout<<"----------------------------报单信息确认----------------------------\n"
+		<<"交易前置地址="<<getConfig("CTP","FrontAddr")<<"\n"
+		<<"合约="<<getConfig("CTP","InstrumentID")<<"\n"
+		<<"交易所="<<getConfig("CTP","ExchangeID")<<"\n"
+		<<"价格="<<atof(getConfig("CTP","PressPrice").c_str())<<"\n"
+		<<"[输入‘每秒报单笔数’开始压力测试]：";
+	cin>>m_presstest_mount;
+}
+

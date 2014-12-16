@@ -9,6 +9,7 @@
 using namespace std;
 vector <DWORD> exchRttList,ordcancelRttList,sysRttList;
 vector <DelaylistDetail> aList,errList;
+vector<USERINFO> g_userlist;
 ofstream syslog;
 DWORD tStart,tEnd;
 int nCount=0;
@@ -18,85 +19,51 @@ void OrderInsertStatistics();
 void OrderCanceledStatistics();
 void OrderUnknownStatistics();
 void genReport(int input);
+int test_delay();
+int test_press();
+void getuserlist();
+void *pressthread(void *arg);
+void balance(int &_userCount, DWORD &_freq, int _pressMount);
 
 int main(int argc, char *argv[])
 {
-	system("clear");
-	cout<<  "      +############################ 免责声明 ########################+\n"
-		"      | 本软件只做内部测试使用，一切因使用本软件而引致之任何意外、   |\n"
-		"      | 疏忽、合约毁坏、诽谤、版权或知识产权侵犯及其所造成的损失，本 |\n"
-		"      | 软件概不负责，亦不承担任何法律责任。                         |\n"
-		"      +--------------------------------------------------------------+\n"
-		"如果要继续使用，则表示您已阅读并同意上述声明的所有条款之约定；否则立即停止使用。\n"
-		"同意并继续使用(输入jixu)，不同意(n):";
-	string t;
-	cin>>t;
-	if (t!="jixu")
-	{
-		_exit(0);
-	}
-
-
-
-
 	if (argc==2 && strcmp(argv[1],"-v")==0)
 	{ 
-		cout<<"order insert tool v1.14.11.24 "<<__DATE__<<" "<<__TIME__<<endl;
+		cout<<"order insert tool v1.14.12.16 "<<__DATE__<<" "<<__TIME__<<endl;
 		_exit(0);
 	}
 
+	disclaimer();
+
+	getuserlist();
+
+	int mainchoose,t;
 	syslog.open("syslog.txt");
 
-	cout<<"1.ctp报单测试\n"
-		<<"2.feima报单测试\n"
-		<<"3.cffex报单测试\n"
-		<<"4.shfe报单测试\n"
-		<<"5.金飞鼠报单测试\n"
+	cout<<"********************\n"
+		<<"       主菜单       \n"
+		<<"********************\n";
+	cout<<"1.压力测试\n"
+		<<"2.报单延时响应测试\n"
 		<<"请输入:";
-		
-	int input;
-	cin>>input;
-	string systype;
-
-	startTime = logtime();
-
-	if (input == 1)
+	cin>>mainchoose;
+	switch(mainchoose)
 	{
-		CTraderHandlerBaseCTP *ctp = new CTraderHandlerBaseCTP;
-		ctp->connect();
-		ctp->orderinsert();
+	case 1:
+		t=test_press();
+		break;
+	case 2:
+		t=test_delay();
+		break;
+	default:
+		break;
 	}
-	else if (input == 2)
-	{
-		CTraderHandlerBaseFeima *fm = new CTraderHandlerBaseFeima;
-		fm->connect();
-		fm->orderinsert();
-	}
-	else if (input == 3)
-	{
-		CTraderHandlerBaseCFFEX *ffex = new CTraderHandlerBaseCFFEX;
-		ffex->connect();
-		ffex->orderinsert();
-	}
-	else if (input == 4)
-	{
-		CTraderHandlerBaseSHFE *shfe = new CTraderHandlerBaseSHFE;
-		shfe->connect();
-		shfe->orderinsert();
-	}
-	else if (input == 5)
-	{
-		CTraderHandlerBaseSGIT *sg = new CTraderHandlerBaseSGIT;
-		sg->connect();
-		sg->orderinsert();
-	}
-	
 
 	syslog.close();
 	OrderInsertStatistics();
 	OrderCanceledStatistics();
 	OrderUnknownStatistics();
-	genReport(input);
+	genReport(t);
 	cout<<"EXE EXITED!"<<endl;
 	return 1;
 }
@@ -170,7 +137,6 @@ void OrderUnknownStatistics()
 		<<endl;
 }
 
-
 void genReport(int input)
 {
 	string systype;
@@ -210,6 +176,7 @@ void genReport(int input)
 
 	string file = "report_"+filetime()+".txt";
 	ofstream report(file.c_str());
+	report.setf(ios::fixed);
 	//标题
 	report<<"                                            报单延时测试报告                                              \n"
 		<<"                                                                       制表时间："<<logtime()<<"\n"
@@ -234,7 +201,6 @@ void genReport(int input)
 		<<"|  序号  | 交易所 | 合约 | 方向 |  价格  | 开平 |  延时  |   报单引用   |               报单状态         |\n"
 		<<"+--------+--------+------+------+--------+------+--------+--------------+--------------------------------+\n";
 	
-	report.setf(ios::fixed);
 	for (int i=0; i<aList.size(); i++)
 	{
 		report<<setprecision(2)
@@ -303,4 +269,166 @@ void genReport(int input)
 
 	report.close();
 	_exit(0);
+}
+
+int test_delay()
+{
+	int input;
+	cout<<"********************\n"
+		<<"   报单延时响应测试  \n"
+		<<"********************\n";
+	cout<<"1.ctp报单测试\n"
+		<<"2.feima报单测试\n"
+		<<"3.cffex报单测试\n"
+		<<"4.shfe报单测试\n"
+		<<"5.金飞鼠报单测试\n"
+		<<"请输入:";
+
+	cin>>input;
+	string systype;
+
+	startTime = logtime();
+
+	if (input == 1)
+	{
+		CTraderHandlerBaseCTP *ctp = new CTraderHandlerBaseCTP;
+		ctp->showdelaytestconfirmsg();
+		ctp->connect();
+		ctp->delaytest();
+	}
+	else if (input == 2)
+	{
+		CTraderHandlerBaseFeima *fm = new CTraderHandlerBaseFeima;
+		fm->showdelaytestconfirmsg();
+		fm->connect();
+		fm->delaytest();
+	}
+	else if (input == 3)
+	{
+		CTraderHandlerBaseCFFEX *ffex = new CTraderHandlerBaseCFFEX;
+		ffex->showdelaytestconfirmsg();
+		ffex->connect();
+		ffex->delaytest();
+	}
+	else if (input == 4)
+	{
+		CTraderHandlerBaseSHFE *shfe = new CTraderHandlerBaseSHFE;
+		shfe->showdelaytestconfirmsg();
+		shfe->connect();
+		shfe->delaytest();
+	}
+	else if (input == 5)
+	{
+		CTraderHandlerBaseSGIT *sg = new CTraderHandlerBaseSGIT;
+		sg->showdelaytestconfirmsg();
+		sg->connect();
+		sg->delaytest();
+	}
+	return input;
+}
+
+int test_press()
+{
+	cout<<"********************\n"
+		<<"      压力测试       \n"
+		<<"********************\n";
+	cout<<"1.ctp压力测试\n"
+		<<"请输入:";
+	int input;
+	cin>>input;
+	string systype;
+
+	startTime = logtime();
+
+	if (input == 1)
+	{	
+		int c;			//投资者数量
+		DWORD itvl;		//报单频率
+		balance(c, itvl, atoi(getConfig("CTP","PressMount").c_str()));
+		for (int i=0; i<c ; i++)
+		{
+			THREADPARAM *t = new THREADPARAM;
+			t->uid = i;
+			t->interval = itvl;
+			t->type = CTPTRADE;
+			pthread_t p;
+			pthread_create(&p, 0, pressthread, t);
+		}
+		Sleep(INFINITE);
+	}
+	else
+	{
+		_exit(0);
+	}
+	return input;
+}
+
+void getuserlist()
+{
+	string path=getConfig("CTP","Userlist");
+	ifstream file;
+	file.open(path.c_str());
+	if (!file)
+	{
+		cout<<"Can not open file "<<path<<endl;
+		_exit(-1);
+	}
+	string line;
+	while(getline(file, line, '\n'))
+	{
+		if (line.find("BrokerID")!=string::npos || line.find("#")!=string::npos || line.length()<2)
+			continue;
+		USERINFO u;
+		u.BrokerID = getSubstr(line, 1, ",");
+		u.UserID = getSubstr(line, 2, ",");
+		u.Password = getSubstr(line, 3, ",");
+		u.InvestorID = getSubstr(line, 4, ",");
+		u.ParticipantID = getSubstr(line, 5, ",");
+		u.ClientID = getSubstr(line, 6, ",");
+		g_userlist.push_back(u);
+	}
+	if (g_userlist.size()<1)
+	{
+		cout<<path<<" 没有投资者或者格式错误！"<<endl;
+		_exit(0);
+	}
+}
+
+void *pressthread(void *arg)
+{
+	THREADPARAM t = *(THREADPARAM *)arg;
+	if (t.type == CTPTRADE)
+	{
+		CTraderHandlerBaseCTP *ctp = new CTraderHandlerBaseCTP;
+		ctp->connect(t.uid);
+		ctp->presstest(t.interval);
+	}
+	else
+	{
+		_exit(0);
+	}
+}
+
+//分配报单频率和投资者数量
+void balance(int &_userCount, DWORD &_freq, int _pressMount)
+{
+	_userCount = 1;
+	while (true)
+	{
+		if (1000%(_pressMount/_userCount)!=0)				//每个投资者压多少笔,除不尽就要增加投资者
+		{
+			_userCount++;
+		}
+		else
+		{
+			if (_userCount>g_userlist.size())
+			{
+				cout<<"投资者数量不够，需要"<<_userCount<<"个"<<endl;
+				_exit(0);
+			}
+			
+			_freq = 1000/(_pressMount/_userCount);
+			return;
+		}
+	}
 }
