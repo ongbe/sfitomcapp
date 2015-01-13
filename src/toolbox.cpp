@@ -540,6 +540,7 @@ string getEthernetInterfaceType()
 			bMore=true;
 		}
 	}
+	system("rm -rf /tmp/getEthernetInterfaceType.txt");
 	return rt;
 }
 

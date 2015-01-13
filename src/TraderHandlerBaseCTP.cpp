@@ -16,7 +16,7 @@ CTraderHandlerBaseCTP::CTraderHandlerBaseCTP()
 	bOnRspOrderAction=atoi(getConfig("LOG","OnRspOrderAction").c_str());
 	bOnRspOrderInsert=atoi(getConfig("LOG","OnRspOrderInsert").c_str());
 	bOnRspError=atoi(getConfig("LOG","OnRspError").c_str());
-	bOnRtnOrder=false;
+	bOnRtnOrder=true;
 	nRequestID = 0;
 	strcpy(m_instrumentid, getConfig("CTP","InstrumentID").c_str());
 	strcpy(m_exchangeid, getConfig("CTP","ExchangeID").c_str());
@@ -306,13 +306,13 @@ void CTraderHandlerBaseCTP::presstest(DWORD _interval)
 		m_pUserApi->ReqOrderInsert(&inputOrder, 0);
 		Sleep(_interval);
 
-		strcpy(inputOrder.CombOffsetFlag, "1");
+		strcpy(inputOrder.CombOffsetFlag, "3");
 		inputOrder.Direction=THOST_FTDC_D_Buy;
 		inputOrder.RequestID=nRequestID++;
 		m_pUserApi->ReqOrderInsert(&inputOrder, 0);
 		Sleep(_interval);
 
-		strcpy(inputOrder.CombOffsetFlag, "1");
+		strcpy(inputOrder.CombOffsetFlag, "3");
 		inputOrder.Direction=THOST_FTDC_D_Sell;
 		inputOrder.RequestID=nRequestID++;
 		m_pUserApi->ReqOrderInsert(&inputOrder, 0);
@@ -327,7 +327,10 @@ void CTraderHandlerBaseCTP::showpresstestconfirmsg()
 		<<"合约="<<getConfig("CTP","InstrumentID")<<"\n"
 		<<"交易所="<<getConfig("CTP","ExchangeID")<<"\n"
 		<<"价格="<<atof(getConfig("CTP","PressPrice").c_str())<<"\n"
-		<<"[输入‘每秒报单笔数’开始压力测试]：";
-	cin>>m_presstest_mount;
+		<<"每秒压力笔数="<<atoi(getConfig("CTP","PressAmount").c_str())<<"\n"
+		<<"[按回车开始报单测试]"
+		<<endl;
+
+	pressentertocontiue();
 }
 
